@@ -9,7 +9,7 @@ AF_DCMotor motor(2);          // Motor no canal M2 do shield
 
 volatile unsigned int pulsos = 0;
 unsigned long tempoAnterior = 0;
-const unsigned long intervalo = 50;  // Intervalo de amostragem em ms
+const unsigned long intervalo = 10;  // Intervalo de amostragem em ms
 
 // ========== Média móvel ==========
 const int TAM_JANELA = 10;
