@@ -1,0 +1,80 @@
+#include <AFMotor.h>
+
+// ========== DEFINIÇÕES ==========
+#define ENCODER 18            // Pino digital ligado ao encoder
+#define N_DENTES 16           // Número de furos/dentes na roda fônica
+const int potPin = A12;       // Pino do potenciômetro
+
+AF_DCMotor motor(2);          // Motor no canal M2 do shield
+
+volatile unsigned int pulsos = 0;
+unsigned long tempoAnterior = 0;
+const unsigned long intervalo = 50;  // Intervalo de amostragem em ms
+
+// ========== Média móvel ==========
+const int TAM_JANELA = 10;
+float janelaRPM[TAM_JANELA] = {0};
+int indiceJanela = 0;
+float mediaRPM = 0;
+
+// ========== INTERRUPÇÃO ==========
+void contarPulso() {
+  pulsos++;
+}
+
+// ========== SETUP ==========
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(ENCODER, INPUT);
+  attachInterrupt(digitalPinToInterrupt(ENCODER), contarPulso, RISING);
+
+  motor.setSpeed(0);
+  motor.run(FORWARD);
+}
+
+// ========== LOOP PRINCIPAL ==========
+void loop() {
+  // Controle de velocidade do motor pelo potenciômetro
+  int potValue = analogRead(potPin);
+  int pwmValue = map(potValue, 0, 1023, 0, 255);
+  motor.setSpeed(pwmValue);
+
+  // Verifica se passou o intervalo de tempo definido
+  unsigned long tempoAtual = millis();
+  if (tempoAtual - tempoAnterior >= intervalo) {
+    // Calcula o tempo decorrido em segundos
+    float deltaTempo = (tempoAtual - tempoAnterior) / 1000.0;
+
+    // Atualiza o tempo anterior
+    tempoAnterior = tempoAtual;
+
+    // Lê e zera o contador de pulsos de forma segura
+    noInterrupts();
+    int contador = pulsos;
+    pulsos = 0;
+    interrupts();
+
+    // Calcula o RPM com base no tempo real decorrido
+    float rpm = ((float)contador / N_DENTES) / deltaTempo * 60.0;
+
+    // Atualiza média móvel
+    janelaRPM[indiceJanela] = rpm;
+    indiceJanela = (indiceJanela + 1) % TAM_JANELA;
+
+    float soma = 0;
+    for (int i = 0; i < TAM_JANELA; i++) {
+      soma += janelaRPM[i];
+    }
+    mediaRPM = soma / TAM_JANELA;
+
+    // Impressão dos valores no monitor serial
+    Serial.print("RPM Médio: ");
+    Serial.print(mediaRPM, 1);
+    Serial.print("   |   RPM Inst: ");
+    Serial.println(rpm, 1);
+  }
+
+  // Pequeno delay opcional para ajudar na estabilidade
+  delay(10);
+}
